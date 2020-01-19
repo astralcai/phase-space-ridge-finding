@@ -1,0 +1,25 @@
+Simulation is of a system of test particles in the background
+potential of an axisymmetric Milky Way like galaxy. The test particles
+all have the same angular momentum, which is set so that their guiding
+radius is at R_circ = 8 kpc. Since the particles have some radial
+velocity, and are therefore not on perfect circular orbits, the
+particles fill out a ring in the xy plane, centred on R=8 kpc.
+
+The ring is given a small, axisymmetric perturbation and then allowed
+to evolve. Thus, the phase space is 4 dimensional, since V_phi is 
+determined from the radius R and the angular momentum (which is the 
+same for each particle) and the system is independent of phi. We thus
+write the phase space coordinates as (z,R,vR,vz).
+
+4DPhaseSpace.ipynb makes nice corner plots of the 4D phase space for a
+simulation snapshot.
+
+P_DeltaRc.bin P_DeltaRc.0250, .0500, .0750, .1000 are initial conditions
+and the snapshots at 250Myr, 500Myr, 750Myr, and 1Gyr respectively.
+
+Snapshots are in binary form. To convert to .ascii, run the reverter.c code
+
+./reverter P_DeltaRc.bin P_DeltaRc.info P_DeltaRc.ascii
+
+etc.
+
