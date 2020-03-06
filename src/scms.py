@@ -37,12 +37,14 @@ def interpolate2(x, y, X, Y, vals):
     if x < X[0] or x > X[-1] or y < Y[0] or y > Y[-1]:
         return 0
 
-    i = int((x - X[0]) // (X[1] - X[0]))
-    j = int((y - Y[0]) // (Y[1] - Y[0]))
+    dx, dy = X[1] - X[0], Y[1] - Y[0]
 
-    v11, v12, v21, v22 = vals[i, j], vals[i, j + 1], vals[i + 1, j], vals[i + 1, j + 1]
+    i = int((x - X[0]) // dx)
+    j = int((y - Y[0]) // dy)
 
-    result = 1 / ((X[i + 1] - X[i]) * (Y[j + 1] - Y[j])) * np.dot(np.dot(
+    v11, v12, v21, v22 = vals[i, j], vals[i, j+1], vals[i+1, j], vals[i+1, j+1]
+
+    result = 1 / (dx * dy) * np.dot(np.dot(
         np.array([X[i + 1] - x, x - X[i]]), np.array(
             [[v11, v12], [v21, v22]])), np.vstack([Y[j + 1] - y, y - Y[j]]))
 
@@ -66,6 +68,8 @@ def get_derivatives2(x, y, X, Y, pdf, dpdf, ddpdf):
 
 
 def meanshift(point, x, y, pdf, dpdf, ddpdf):
+    """Calculates the mean shift vector"""
+
     dx, dy, dxx, dyy, dxy, dyx = get_derivatives2(
         point[0], point[1], x, y, pdf, dpdf, ddpdf)
     Hessian = np.array([[dxx, dxy], [dyx, dyy]])
@@ -115,8 +119,8 @@ def rk_approximate(point, x, y, pdf, dpdf, ddpdf, h):
 def scms2(points, x, y, pdf, dpdf, ddpdf, iterations=20):
     """Perform 2D subspacee constrained mean shift algorithm on the given points"""
 
-    dx0 = 0.000006
-    dy0 = 0.000006
+    dx0 = 0.000001
+    dy0 = 0.000001
     momentum = np.zeros((len(points), 2))
     H = np.zeros(len(points)) + 0.05  # step sizes
     for i in range(iterations):
@@ -138,7 +142,7 @@ def scms2(points, x, y, pdf, dpdf, ddpdf, iterations=20):
                 new_pt = pt2 + momentum[i] * 0.5
                 momentum[i] = pt2 - points[i]
                 points[i] = new_pt
-        plt.plot(points[:,0], points[:,1], 'k.', markersize=0.3)
-        plt.show()
-    
+        # plt.plot(points[:,0], points[:,1], 'k.', markersize=0.3)
+        # plt.show()
+
     return points
