@@ -1,0 +1,7 @@
+axes.titlesize : 18
+axes.labelsize : 20
+xtick.major.size : 4
+ytick.major.size : 4
+font.size : 18
+lines.linewidth : 2
+figure.constrained_layout.use : True
