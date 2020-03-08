@@ -14,7 +14,7 @@ def generate_mesh2(x, y, threshold, pdf):
     """Generate the original 2D mesh of points"""
 
     # create original mesh
-    xx, yy = np.meshgrid(x, y, indexing='ij')
+    xx, yy = np.meshgrid(x, y, indexing='xy')
 
     # thresholding
     xx_ma = np.ma.masked_where(pdf < threshold, xx)
@@ -37,12 +37,16 @@ def interpolate2(x, y, X, Y, vals):
     if x < X[0] or x > X[-1] or y < Y[0] or y > Y[-1]:
         return 0
 
-    i = int((x - X[0]) // (X[1] - X[0]))
-    j = int((y - Y[0]) // (Y[1] - Y[0]))
+    dx, dy = X[1] - X[0], Y[1] - Y[0]
 
-    v11, v12, v21, v22 = vals[i, j], vals[i, j + 1], vals[i + 1, j], vals[i + 1, j + 1]
+    vals = vals.T
 
-    result = 1 / ((X[i + 1] - X[i]) * (Y[j + 1] - Y[j])) * np.dot(np.dot(
+    i = int((x - X[0]) // dx)
+    j = int((y - Y[0]) // dy)
+
+    v11, v12, v21, v22 = vals[i, j], vals[i, j+1], vals[i+1, j], vals[i+1, j+1]
+
+    result = 1 / (dx * dy) * np.dot(np.dot(
         np.array([X[i + 1] - x, x - X[i]]), np.array(
             [[v11, v12], [v21, v22]])), np.vstack([Y[j + 1] - y, y - Y[j]]))
 
@@ -65,7 +69,9 @@ def get_derivatives2(x, y, X, Y, pdf, dpdf, ddpdf):
     return dx, dy, dxx, dyy, dxy, dyx
 
 
-def meanshift(point, x, y, pdf, dpdf, ddpdf):
+def meanshift2(point, x, y, pdf, dpdf, ddpdf):
+    """Calculates the 2D mean shift vector"""
+
     dx, dy, dxx, dyy, dxy, dyx = get_derivatives2(
         point[0], point[1], x, y, pdf, dpdf, ddpdf)
     Hessian = np.array([[dxx, dxy], [dyx, dyy]])
@@ -78,30 +84,30 @@ def meanshift(point, x, y, pdf, dpdf, ddpdf):
     return normalize(MC)
 
 
-def rk_approximate(point, x, y, pdf, dpdf, ddpdf, h):
+def rk_approximate2(point, x, y, pdf, dpdf, ddpdf, h):
     px, py = point
-    MC = meanshift([px, py], x, y, pdf, dpdf, ddpdf)
+    MC = meanshift2([px, py], x, y, pdf, dpdf, ddpdf)
     # First Step
     k1 = h * MC
     # Step 2
     px, py = point + k1 / 5
-    MC = meanshift([px, py], x, y, pdf, dpdf, ddpdf)
+    MC = meanshift2([px, py], x, y, pdf, dpdf, ddpdf)
     k2 = h * MC
     #Step 3
     px, py = point + k1 * 3. / 40 + k2 * 9. / 40
-    MC = meanshift([px, py], x, y, pdf, dpdf, ddpdf)
+    MC = meanshift2([px, py], x, y, pdf, dpdf, ddpdf)
     k3 = h * MC
     #Step 4
     px, py = point + k1 * 3. / 10 + k2 * (-9./10) + k3 * 6. / 5
-    MC = meanshift([px, py], x, y, pdf, dpdf, ddpdf)
+    MC = meanshift2([px, py], x, y, pdf, dpdf, ddpdf)
     k4 = h * MC
     #Step 5
     px, py = point+k1*(-11./54)+k2*5./2+k3*(-70/27)+k4*35./27
-    MC = meanshift([px, py], x, y, pdf, dpdf, ddpdf)
+    MC = meanshift2([px, py], x, y, pdf, dpdf, ddpdf)
     k5 = h * MC
     #Step 6
     px, py = point+k1*(1631./55296)+k2*(175./512)+k3*(575./13824)+k4*(44275./110592)+k5*(253./4096)
-    MC = meanshift([px, py], x, y, pdf, dpdf, ddpdf)
+    MC = meanshift2([px, py], x, y, pdf, dpdf, ddpdf)
     k6 = h * MC
     #Fifth-order Runge-Kutta formula
     result = point+k1*37/378+k3*250./621+k4*125./594+k6*512./1771
@@ -112,16 +118,16 @@ def rk_approximate(point, x, y, pdf, dpdf, ddpdf, h):
     return result, result2
 
 
-def scms2(points, x, y, pdf, dpdf, ddpdf, iterations=20):
+def scms2(points, x, y, pdf, dpdf, ddpdf, iterations=20, m=0.5):
     """Perform 2D subspacee constrained mean shift algorithm on the given points"""
 
-    dx0 = 0.000006
-    dy0 = 0.000006
+    dx0 = 0.000001
+    dy0 = 0.000001
     momentum = np.zeros((len(points), 2))
     H = np.zeros(len(points)) + 0.05  # step sizes
     for i in range(iterations):
         for i in range(len(points)):
-            pt1, pt2 = rk_approximate(points[i], x, y, pdf, dpdf, ddpdf, H[i])
+            pt1, pt2 = rk_approximate2(points[i], x, y, pdf, dpdf, ddpdf, H[i])
             dx1 = abs(pt2[0]-pt1[0])
             modx = 2 if dx1 == 0 else min(2, (dx0 / dx1) ** 0.2)
             dy1 = abs(pt2[1]-pt1[1])
@@ -129,16 +135,16 @@ def scms2(points, x, y, pdf, dpdf, ddpdf, iterations=20):
             mod = min(modx, mody)
             if(mod < 1): # d1 > d0, we have to retry! with new step
                 H[i] = H[i] * mod
-                pt1, pt2 = rk_approximate(points[i], x, y, pdf, dpdf, ddpdf, H[i])
-                new_pt = pt2 + momentum[i] * 0.5
+                pt1, pt2 = rk_approximate2(points[i], x, y, pdf, dpdf, ddpdf, H[i])
+                new_pt = pt2 + momentum[i] * m
                 momentum[i] = pt2 - points[i]
                 points[i] = new_pt
             else: # we can safely increase the next step size
                 H[i] = H[i] * mod
-                new_pt = pt2 + momentum[i] * 0.5
+                new_pt = pt2 + momentum[i] * m
                 momentum[i] = pt2 - points[i]
                 points[i] = new_pt
-        plt.plot(points[:,0], points[:,1], 'k.', markersize=0.3)
-        plt.show()
-    
+        # plt.plot(points[:,0], points[:,1], 'k.', markersize=0.3)
+        # plt.show()
+
     return points

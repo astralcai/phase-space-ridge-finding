@@ -1,0 +1,8 @@
+axes.titlesize : 30
+axes.labelsize : 32
+xtick.major.size : 8
+ytick.major.size : 8
+font.size : 30
+savefig.bbox : tight
+savefig.pad_inches : 0.1
+lines.linewidth : 3
