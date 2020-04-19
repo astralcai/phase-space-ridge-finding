@@ -3,6 +3,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+
 def normalize(vec):
     norm = np.linalg.norm(vec)
     if (norm == 0):
@@ -25,13 +26,21 @@ def generate_mesh2(x, y, threshold, pdf):
 
     return points
 
+    # result = []
+    # for point in points:
+    #     x, y = point
+    #     if interpolate2(x, y, grid_x, grid_y, pdf) > threshold:
+    #         result.append(point)
+
+    # return np.asarray(result)
+
 
 def interpolate2(x, y, X, Y, vals):
     """interpolate a value for a given point in 2D
-    
+
     TODO: try derivative based interpolation:
     https://dspace.library.uu.nl/bitstream/handle/1874/580/c4.pdf
-    
+
     """
 
     if x < X[0] or x > X[-1] or y < Y[0] or y > Y[-1]:
@@ -39,16 +48,14 @@ def interpolate2(x, y, X, Y, vals):
 
     dx, dy = X[1] - X[0], Y[1] - Y[0]
 
-    vals = vals.T
+    j = int((x - X[0]) / dx)
+    i = int((y - Y[0]) / dy)
 
-    i = int((x - X[0]) // dx)
-    j = int((y - Y[0]) // dy)
-
-    v11, v12, v21, v22 = vals[i, j], vals[i, j+1], vals[i+1, j], vals[i+1, j+1]
+    v11, v12, v21, v22 = vals[i, j], vals[i+1, j], vals[i, j+1], vals[i+1, j+1]
 
     result = 1 / (dx * dy) * np.dot(np.dot(
-        np.array([X[i + 1] - x, x - X[i]]), np.array(
-            [[v11, v12], [v21, v22]])), np.vstack([Y[j + 1] - y, y - Y[j]]))
+        np.array([X[j + 1] - x, x - X[j]]), np.array(
+            [[v11, v12], [v21, v22]])), np.vstack([Y[i + 1] - y, y - Y[i]]))
 
     return result[0]
 
@@ -93,27 +100,30 @@ def rk_approximate2(point, x, y, pdf, dpdf, ddpdf, h):
     px, py = point + k1 / 5
     MC = meanshift2([px, py], x, y, pdf, dpdf, ddpdf)
     k2 = h * MC
-    #Step 3
+    # Step 3
     px, py = point + k1 * 3. / 40 + k2 * 9. / 40
     MC = meanshift2([px, py], x, y, pdf, dpdf, ddpdf)
     k3 = h * MC
-    #Step 4
+    # Step 4
     px, py = point + k1 * 3. / 10 + k2 * (-9./10) + k3 * 6. / 5
     MC = meanshift2([px, py], x, y, pdf, dpdf, ddpdf)
     k4 = h * MC
-    #Step 5
+    # Step 5
     px, py = point+k1*(-11./54)+k2*5./2+k3*(-70/27)+k4*35./27
     MC = meanshift2([px, py], x, y, pdf, dpdf, ddpdf)
     k5 = h * MC
-    #Step 6
-    px, py = point+k1*(1631./55296)+k2*(175./512)+k3*(575./13824)+k4*(44275./110592)+k5*(253./4096)
+    # Step 6
+    px, py = point+k1*(1631./55296)+k2*(175./512)+k3 * \
+        (575./13824)+k4*(44275./110592)+k5*(253./4096)
     MC = meanshift2([px, py], x, y, pdf, dpdf, ddpdf)
     k6 = h * MC
-    #Fifth-order Runge-Kutta formula
+
+    # Fifth-order Runge-Kutta formula
     result = point+k1*37/378+k3*250./621+k4*125./594+k6*512./1771
-    
-    #Embedded fourth-order Runge-Kutta formula
-    result2 = point+k1*2825./27648+k3*18575./48384+k4*13525./55296+k5*277./14336+k6*1./4
+
+    # Embedded fourth-order Runge-Kutta formula
+    result2 = point+k1*2825./27648+k3*18575. / \
+        48384+k4*13525./55296+k5*277./14336+k6*1./4
 
     return result, result2
 
@@ -125,7 +135,8 @@ def scms2(points, x, y, pdf, dpdf, ddpdf, iterations=20, m=0.5):
     dy0 = 0.000001
     momentum = np.zeros((len(points), 2))
     H = np.zeros(len(points)) + 0.05  # step sizes
-    for i in range(iterations):
+    for t in range(iterations):
+        print("~", end='')
         for i in range(len(points)):
             pt1, pt2 = rk_approximate2(points[i], x, y, pdf, dpdf, ddpdf, H[i])
             dx1 = abs(pt2[0]-pt1[0])
@@ -133,18 +144,24 @@ def scms2(points, x, y, pdf, dpdf, ddpdf, iterations=20, m=0.5):
             dy1 = abs(pt2[1]-pt1[1])
             mody = 2 if dy1 == 0 else min(2, (dy0 / dy1) ** 0.2)
             mod = min(modx, mody)
-            if(mod < 1): # d1 > d0, we have to retry! with new step
+            if(mod < 1):  # d1 > d0, we have to retry! with new step
                 H[i] = H[i] * mod
-                pt1, pt2 = rk_approximate2(points[i], x, y, pdf, dpdf, ddpdf, H[i])
+                pt1, pt2 = rk_approximate2(
+                    points[i], x, y, pdf, dpdf, ddpdf, H[i])
                 new_pt = pt2 + momentum[i] * m
                 momentum[i] = pt2 - points[i]
                 points[i] = new_pt
-            else: # we can safely increase the next step size
+            else:  # we can safely increase the next step size
                 H[i] = H[i] * mod
                 new_pt = pt2 + momentum[i] * m
                 momentum[i] = pt2 - points[i]
                 points[i] = new_pt
-        # plt.plot(points[:,0], points[:,1], 'k.', markersize=0.3)
-        # plt.show()
+        # if t % 5 == 0:
+        #     plt.plot(points[:,0], points[:,1], 'k.', markersize=0.3)
+        #     plt.xlabel('$z$')
+        #     plt.ylabel('$v_z$')
+        #     plt.title('Iteration: {}'.format(t))
+        #     plt.savefig('scms_i{}.png'.format(t))
+        #     plt.show()
 
     return points
